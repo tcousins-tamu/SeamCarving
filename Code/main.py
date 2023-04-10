@@ -18,6 +18,35 @@ def Read(id, path = ""):
 
     return source, mask
 
+def findSeam(energy):
+    #Finds the minimum seam
+    energyCpy = copy.deepcopy(energy)
+    backtrack = np.zeros(energy.shape)
+    for x in range(0, energy.shape[0]-1):
+        for y in range(0, energy.shape[-1]-1):
+            minE = 0
+            if y ==0:
+                idx = np.argmin(energyCpy[x-1, y:y+2])
+                backtrack[x, y] = idx + y
+                minE = energyCpy[x-1, idx+y]
+            else:
+                idx = np.argmin(energyCpy[x-1, y-1:y+2])
+                backtrack[x, y] = idx + y -1
+                minE = energyCpy[x-1, idx+y-1]
+
+            energyCpy[x, y]+= minE
+    return energyCpy, backtrack
+
+def removeSeam(energy):
+    #Returns the index for which to remove seams
+    energyCpy, backtrack = findSeam(energy)
+    msk = np.ones(energyCpy.shape, dtype=int)
+    y = np.argmin(energyCpy[-1])
+    for x in reversed(range(energyCpy.shape[0])):
+        msk[x, y] = 0
+        y = int(backtrack[x, y])
+    return msk
+
 def SeamCarve(input, widthFac, heightFac, mask):
 
     # Main seam carving function. This is done in three main parts: 1)
@@ -26,6 +55,8 @@ def SeamCarve(input, widthFac, heightFac, mask):
 
     assert (widthFac == 1 or heightFac == 1), 'Changing both width and height is not supported!'
     assert (widthFac <= 1 and heightFac <= 1), 'Increasing the size is not supported!'
+
+    #Add a case here to rotate it by 90 degrees to for width
 
     inSize = input.shape
     size   = (int(widthFac*inSize[1]), int(heightFac*inSize[0]))
@@ -42,29 +73,15 @@ def SeamCarve(input, widthFac, heightFac, mask):
     padX = np.pad(gradX, [[0,0], [0,1]])
     padY = np.pad(gradY, [[0,1], [0,0]])
     energy = padX + padY
+    mask = removeSeam(energy)
 
-    #2.) Finding minimum Seam
-    energyCpy = copy.deepcopy(energy)
-    backtrack = np.zeros(energy.shape)
-    for x in range(0, energy.shape[0]-1):
-        for y in range(0, energy.shape[-1]-1):
-            minE = 0
-            if y ==0:
-                idx = np.argmin(energyCpy[x-1, y:y+2])
-                backtrack[x, y] = idx + y
-                minE = energyCpy[x-1, idx+y]
-            else:
-                idx = np.argmin(energyCpy[x-1, y-1:y+2])
-                backtrack[x, y] = idx + y -1
-                minE = energyCpy[x-1, idx+y-1]
+    #Add a case here to unrotate it by 90 degrees if width
 
-            energyCpy[x, y]+= minE
-    
-    #3.) Removing minimum seam, need cases for width versus height ERMEMBER
-    msk = np.ones(energy.shape)
-    start = np.argmin(energyCpy[-1])
-    for colo in reversed
-    return cv2.resize(input, size), size
+    #Need to make the mask 3 dimensional
+    mask = np.stack([mask]*3, axis=2)
+    print(input.shape, input[mask].shape, size)
+    return input[mask].reshape([input.shape[0], input.shape[1]-1, 3])
+    #return cv2.resize(input[mask].reshape(input.shape[0], input.shape[1]-1, 3), size), size
 
 
 # Setting up the input output paths
